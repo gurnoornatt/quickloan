@@ -58,7 +58,11 @@ export function Chat() {
       const data = await response.json()
       const assistantMessage: Message = {
         role: "assistant",
-        content: data.message,
+        content: data.answer,
+      }
+
+      if (data.workflow) {
+        assistantMessage.content += "\n\nI've created a workflow for you based on your request. Would you like to view it?"
       }
 
       setMessages(current => [...current, assistantMessage])

@@ -10,4 +10,4 @@ supabase>=1.0.3
 PyJWT>=2.0.0
 python-jose[cryptography]>=3.3.0 
 flask>=3.1.0
-flask-cors>=4.0.0flask-cors>=4.0.0
+flask-cors>=4.0.0
