@@ -16,7 +16,7 @@ export function Chat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hello! I'm your AI mortgage assistant. How can I help you today?",
+      content: "Hello! I'm your AI mortgage advisor. I can help you understand different types of mortgages, requirements, and guidelines. What would you like to know?",
     },
   ])
   const [input, setInput] = useState("")
@@ -40,14 +40,19 @@ export function Chat() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Access-Control-Allow-Origin': '*'
         },
+        mode: 'cors',
         body: JSON.stringify({
           messages: [...messages, userMessage]
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get response')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Server error:', errorData)
+        throw new Error(errorData.detail || 'Failed to get response')
       }
 
       const data = await response.json()
@@ -61,7 +66,7 @@ export function Chat() {
       console.error('Error:', error)
       const errorMessage: Message = {
         role: "assistant",
-        content: "I apologize, but I encountered an error. Please try again.",
+        content: "I apologize, but I'm having trouble connecting to the server. Please check your connection and try again.",
       }
       setMessages(current => [...current, errorMessage])
     } finally {
@@ -93,7 +98,7 @@ export function Chat() {
                   {message.role === "assistant" ? "LoanFlash AI" : "You"}
                 </div>
                 <Card className="p-3 bg-zinc-900 border-zinc-800">
-                  <p className="text-sm text-white">{message.content}</p>
+                  <p className="text-sm text-white whitespace-pre-wrap">{message.content}</p>
                   {message.role === "assistant" && (
                     <div className="flex gap-2 mt-2">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:text-white hover:bg-zinc-800">
@@ -110,13 +115,18 @@ export function Chat() {
               </div>
             </div>
           ))}
+          {isLoading && (
+            <div className="flex justify-center">
+              <div className="text-white">Processing your question...</div>
+            </div>
+          )}
         </div>
       </div>
       <div className="border-t border-zinc-800 bg-zinc-950 p-4">
         <div className="max-w-3xl mx-auto">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Textarea
-              placeholder="Ask about mortgage guidelines, requirements, or workflows..."
+              placeholder="Ask about mortgage types, requirements, or guidelines..."
               className="min-h-[60px] text-white placeholder:text-zinc-400 bg-zinc-900 border-zinc-800"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -133,7 +143,7 @@ export function Chat() {
             </Button>
           </form>
           <p className="text-xs text-center text-zinc-400 mt-2">
-            LoanFlash AI can make mistakes. Consider checking important information.
+            LoanFlash AI provides information based on official mortgage guidelines. Always verify important details with a licensed professional.
           </p>
         </div>
       </div>

@@ -4,16 +4,39 @@ from pydantic import BaseModel
 from typing import List
 import os
 from dotenv import load_dotenv
-import openai
+import logging
+import sys
+from supabase import create_client, Client
+from loanFlash.nlp_engine import MortgageNLPEngine
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Load environment variables
 load_dotenv()
 
+# Initialize FastAPI
 app = FastAPI()
+
+# Initialize Supabase
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# Initialize NLP Engine
+nlp_engine = MortgageNLPEngine()
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,37 +52,23 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     try:
-        # Set the API key
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise HTTPException(status_code=500, detail="OpenAI API key not found")
+        # Get the user's latest question
+        user_question = request.messages[-1].content if request.messages else ""
         
-        # Initialize the client
-        client = openai.OpenAI(api_key=api_key)
+        # Process query using the NLP engine - now properly awaited
+        result = await nlp_engine.process_query(user_question)
         
-        # Format messages for the API
-        messages = [{"role": m.role, "content": m.content} for m in request.messages]
-        
-        # Add system message to provide context about mortgage assistance
-        messages.insert(0, {
-            "role": "system",
-            "content": "You are a knowledgeable mortgage advisor specializing in all types of mortgages including FHA, conventional, VA, and USDA loans. Provide accurate, helpful information about mortgage processes, requirements, and guidelines."
-        })
-        
-        # Make the API call
-        response = await client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=500
-        )
-        
-        # Extract and return the response
-        return {"message": response.choices[0].message.content}
+        # Return the exact response format from the NLP engine
+        if result['success']:
+            return {"message": result['answer']}
+        else:
+            logger.error(f"NLP Engine error: {result.get('error', 'Unknown error')}")
+            raise HTTPException(status_code=500, detail=result.get('error', 'Unknown error'))
+            
     except Exception as e:
-        print(f"Error in chat endpoint: {str(e)}")  # Add logging
+        logger.error(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy"} 
+    return {"status": "healthy"}
