@@ -29,18 +29,35 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     try:
-        openai.api_key = os.getenv("OPENAI_API_KEY")
+        # Set the API key
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="OpenAI API key not found")
         
-        # Using the older OpenAI API format for compatibility
-        response = openai.ChatCompletion.create(
+        # Initialize the client
+        client = openai.OpenAI(api_key=api_key)
+        
+        # Format messages for the API
+        messages = [{"role": m.role, "content": m.content} for m in request.messages]
+        
+        # Add system message to provide context about mortgage assistance
+        messages.insert(0, {
+            "role": "system",
+            "content": "You are a knowledgeable mortgage advisor specializing in all types of mortgages including FHA, conventional, VA, and USDA loans. Provide accurate, helpful information about mortgage processes, requirements, and guidelines."
+        })
+        
+        # Make the API call
+        response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": m.role, "content": m.content} for m in request.messages],
+            messages=messages,
             temperature=0.7,
             max_tokens=500
         )
         
-        return {"message": response.choices[0].message["content"]}
+        # Extract and return the response
+        return {"message": response.choices[0].message.content}
     except Exception as e:
+        print(f"Error in chat endpoint: {str(e)}")  # Add logging
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/health")
